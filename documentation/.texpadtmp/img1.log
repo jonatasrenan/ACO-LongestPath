@@ -1,0 +1,54 @@
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdftex 2015.11.25)  26 NOV 2015 20:11
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**/Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/img1.tex
+(/Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/img1.tex
+/Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/img1.tex:1: Undefined control sequence.
+l.1 \begin
+          {tikzpicture}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/img1.tex:3: Undefined control sequence.
+l.3 \begin
+          {axis}[ scale only axis, xmin=0,xmax=12, axis y line*=left, xlabel...
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/img1.tex:4: Undefined control sequence.
+l.4     \addplot
+                [green] coordinates {(0,0)
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+
+Overfull \hbox (20.07964pt too wide) in paragraph at lines 3--11
+\tenrm [green] co-or-di-nates (0,0) (1,0.03)(2,0.04) (3,0.06)(4,0.7) (5,1.1)(6,1.4) (7,1.5)(8,1.2) (9,0.8)(10,0.5) (11,0.3)(12,0.1); |
+
+\hbox(7.5+2.5)x469.75499, glue set - 1.0
+.\tenrm [
+.\tenrm g
+.\tenrm r
+.\tenrm e
+.\tenrm e
+.etc.
+
+[1{/usr/local/texlive/2015/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] )</usr/local/texlive/2015/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb>
+Output written on /Users/jonatas/RubymineProjects/ACO-LongestPath/documentation/.texpadtmp/img1.pdf (1 page, 18503 bytes).
+PDF statistics:
+ 12 PDF objects out of 1000 (max. 8388607)
+ 7 compressed objects within 1 object stream
+ 0 named destinations out of 1000 (max. 500000)
+ 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+

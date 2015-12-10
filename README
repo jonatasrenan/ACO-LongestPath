@@ -1,0 +1,31 @@
+JONATAS RENAN CAMILO ALVES
+jonatas@dcc.ufmg.br
+===========================
+
+Exemplos de execução para o problema de LP ACO na pasta scripts
+
+Documentação completa em documentation/tp2-jonatasrenan.pdf
+
+Parameters:
+
+  --min_runs value : valor mínimo de runs
+  --max_runs value : valor máximo de runs
+  --step_runs value : tamanho do passo de runs
+  --min_ants value : valor mínimo de ants
+  --max_ants value : valor máximo de ants
+  --step_ants value : tamanho do passo de ants
+  --iterations value : número de iterações
+  --initial_pheromone_amount value : valor de feromônio inicial 
+  --ant_pheromone_deposit_amount value : valor do padrão do depósito de feromônio quando a formiga caminha 
+  --pheromone_evaporation_rate value : taxa de evaporação do feromônio
+  --daemon_pheromone_deposit_amount value : valor de depósito da melhor formiga
+  --max_pheromone_threshold value : valor máximo de feromônio na aresta
+  --min_pheromone_threshold value : valor mínimo de feromônio na aresta
+  --alpha value : Parâmetro da função de seleção de aresta pela formiga relacionado ao feromônio
+  --beta value : Parâmetro da função de seleção de aresta pela formiga relacionado ao peso da aresta
+  --exploitation_factor value
+  --input_file_path file
+  --optimum_cost value
+  --output_header
+  --output_file value
+  --description description

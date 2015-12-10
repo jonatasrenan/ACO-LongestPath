@@ -1,0 +1,1089 @@
+% !TEX encoding = UTF-8 Unicode
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage[portuguese]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{algorithm, algorithmic}
+
+\usepackage{pgfplots}
+
+
+\begin{document}
+\title{Computação Natural: Trabalho Prático 2 \\
+\large Otimização por Colônia de Formigas}
+\author{Jônatas Renan \\
+\{\textit{jonatas@dcc.ufmg.br}\}}
+\maketitle
+
+\section{Introdução}
+
+\par
+O algoritmo da otimização da colônia de formigas (ACO, do inglês ant colony optimization algorithm), introduzido por Marco Dorigo em sua tese de PhD é uma heurística baseada em probabilidade, criada para solução de problemas computacionais que envolvem procura de caminhos em grafos. Este algoritmo foi inspirado na observação do comportamento das formigas ao saírem de sua colônia para encontrar comida.
+\newline
+\par
+Na natureza, as formigas andam inicialmente sem rumo até que, encontrada comida, elas retornam à colônia deixando um rastro de feromônio. Se outras formigas encontram um desses rastros, elas tendem a não seguir mais caminhos aleatórios. Em vez disso, seguem a trilha encontrada, retornando e inclusive liberando mais feromônio se acharem mais alimento.
+\newline
+\par
+Com o transcorrer do tempo, entretanto, as trilhas de feromônio começam a evaporar, reduzindo, assim, sua força atrativa. Quanto mais formigas passarem por um caminho predeterminado, mais tempo será necessário para que o feromônio associado àquela trilha evapore. Analogamente, elas marcharão mais rapidamente por sobre um caminho curto, o que implica aumento da densidade de feromônio depositado antes que ele comece a evaporar. A evaporação do feromônio também possui a vantagem de evitar a convergência para uma solução local ótima: se a evaporação não procedesse, todas as trilhas escolhidas pelas primeiras formigas se tornariam excessivamente atrativas para as outras e, neste caso, a exploração do espaço da solução se delimitaria consideravelmente.
+\newline
+\par
+Todavia, quando uma formiga encontra um bom caminho entre a colônia e a fonte de alimento, outras formigas tenderão a seguir este caminho, gerando assim feedback positivo, o que eventualmente torna um determinado caminho mais interessante. A idéia do algoritmo da colônia de formigas é imitar este comportamento através de "formigas virtuais" que caminham por um grafo que por sua vez representa o problema a ser resolvido.
+\newline
+\par
+Apesar de ter sido inicialmente abstraído para produzir soluções quase ótimas para o problema do caixeiro viajante, neste trabalho aplicou-se o ACO como uma metaheurística para o problema do Maior Caminho \textit{Longest Path} ou \textit{LP}.O problema do maior caminho é NP Completo, enquanto a metaheurística que usa o ACO opera em tempo polinomial.
+
+
+\section{Implementação}
+\subsection{Ambiente de Desenvolvimento}
+\par
+O trabalho foi desenvolvido em ambiente de desenvolvimento \textit{ Ruby 2.0.0p645 - 2015-04-13 revision 50299 } com a inclusão da biblioteca Parallel de Michael Grosser (Obtida através do comando \textit{gem install parallel}). 
+\subsection{Parâmetros de Entrada}
+Para que possam ser feitas todas as análises de sensibilidade, foram expostos todos os parâmetros do problema. Segue a lista abaixo com uma breve explicação:
+
+\begin{enumerate}
+  \item $--$min$\_$runs value : valor mínimo de runs
+  \item $--$max$\_$runs value : valor máximo de runs
+  \item $--$step$\_$runs value : tamanho do passo de runs
+  \item $--$min$\_$ants value : valor mínimo de ants
+  \item $--$max$\_$ants value : valor máximo de ants
+  \item $--$step$\_$ants value : tamanho do passo de ants
+  \item $--$iterations value : número de iterações
+  \item $--$initial$\_$pheromone$\_$amount value : valor de feromônio inicial 
+  \item $--$ant$\_$pheromone$\_$deposit$\_$amount value : valor do padrão do depósito de feromônio quando a formiga caminha 
+  \item $--$pheromone$\_$evaporation$\_$rate value : taxa de evaporação do feromônio
+  \item $--$daemon$\_$pheromone$\_$deposit$\_$amount value : valor de depósito da melhor formiga
+  \item $--$max$\_$pheromone$\_$threshold value : valor máximo de feromônio na aresta
+  \item $--$min$\_$pheromone$\_$threshold value : valor mínimo de feromônio na aresta
+  \item $--$alpha value : Parâmetro da função de seleção de aresta pela formiga relacionado ao feromônio
+  \item $--$beta value : Parâmetro da função de seleção de aresta pela formiga relacionado ao peso da aresta
+  \item $--$exploitation$\_$factor value
+  \item $--$input$\_$file$\_$path file
+  \item $--$optimum$\_$cost value
+  \item $--$output$\_$header
+  \item $--$output$\_$file value
+  \item $--$description description
+\end{enumerate}
+
+
+\subsection{Representação do Problema: Longest Path}
+\par
+A entrada do problema consiste em um grafo ponderado direcionado, assim como os nós de início e fim. Deseja-se encontrar o maior caminho entre os dois nós. Para isto apresentaremos parâmetros de entrada que serão analisados para que a saída consista em um caminho válido que parta do nó início e caminhe até o nó fim e seu devido comprimento.
+\newline
+\par
+Para a representação do grafo foi utilizado uma matriz de adjacências implementada como um \textbf{Hash de Arrays} configurados como \textbf{[Fonte [Destino, Peso da Aresta]}. 
+\newline
+\par
+Abaixo, pseudo código do Problema:
+\subsubsection{Pseudo Código: Longest Path}
+ \begin{algorithmic}
+ \STATE Obtém lista de parâmetros de entrada
+ \FOR{iterações} \FOR{formigas}
+ \FOR {execuções \textbf{map} paralelo}
+ \STATE inicializa formiga no nó inicial 
+ \STATE executa formiga
+
+ \ENDFOR
+  \STATE Obtém resultados e guarda melhor resultado global: $reduce$
+ \ENDFOR
+ \ENDFOR
+ \STATE retorna melhor resultado \end{algorithmic}
+
+\newpage
+\subsection{Representação do ACO}
+\par
+O ACO em LP opera em conformidade com o método já aplicado no caixeiro viajante. A maior diferença reside na função de avaliação de uma solução. No ACO, a solução avaliada é o caminho percorrido pela formiga. Para o problema do Maior Caminho, a formiga que percorre o maior caminho liberará mais feromônio que as outras, para atrair as demais formigas para convergência daquela solução.
+\newline
+\par
+
+\subsubsection{Pseudo Código: ACO}
+Dessa forma, o ACO segue o seguinte pseudo-algoritmo para o problema do maior caminho:
+\newline
+\par
+ \begin{algorithmic}
+ \FOR{iterações} \FOR{formigas}
+ \STATE inicializa formiga \STATE formiga procura uma solução recursiva
+ \IF{é uma solução válida} 
+ \STATE deposita feromônio
+ \STATE atualiza a melhor solução local
+ \STATE atualiza o feromônio globalmente
+ \ENDIF \ENDFOR
+ \STATE atualiza a melhor solução global
+ \ENDFOR
+ \newline \end{algorithmic}
+
+\subsubsection{Pseudo código: Atualização global do feromônio}
+
+A cada iteração, a formiga que percorreu o maior caminho em relação as outras formigas, deposita mais feromônio também representado pro uma matriz de adjacências. A quantidade inicial, máxima e mínima de feromônio que uma formiga pode soltar são parâmetros de entrada do modelo.
+\newline
+\par
+Antes de atualizar os feromônios, a matriz de feromônios é evaporada de acordo com o valor de entrada \textbf{taxa de evaporação} . Esta taxa controla a convergência. Uma taxa muito baixa faz o algoritmo convergir rapidamente, pois as formigas vão escolher caminhos com alto teor de feromônio. Uma taxa muito alta deixa o algoritmo aleatório e não há progressão na solução.
+\newline
+\par
+O pseudo código da atualização global de feromônio é:
+\newline
+\par
+ \begin{algorithmic}
+ \FOR{i vértices} \FOR{j vértices}
+ \IF{i != j} 
+ \STATE remove o valor de evaporação para a aresta entre i e j
+ \ENDIF \ENDFOR
+ \ENDFOR
+ \STATE deposita mais feromônio na $melhor$ solução
+ \newline \end{algorithmic}
+\par
+
+\subsection{Formiga: Escolhendo um novo vértice}
+
+ A decisão de escolher um novo vértice para construir um caminho válido é um dos principais fatores para a convergência do ACO. Para que a solução seja boa, será preciso levar em consideração o peso da aresta (distância) e a quantidade de feromônio depositada. Desta forma ela cumpre sua função local que é a maior peso da aresta e sua função global, representada pelo feromônio depositado. A escolha do próximo nó a ser incorporado na solução é baseada em uma função de distribuíção de probabilidade:
+\newline
+\par
+\begin{equation}
+P_{ij} = \frac{F_{ij}^{\alpha} + W_{ij}^{\beta}}{\sum_{j=0}^{N}F_{ij}^{\alpha} + W_{ij}^{\beta}}
+\end{equation}
+\newline
+Em que [i,j] é a aresta que sai de i e chega em j, $F_{ij}$ é a quantidade de feromônio na aresta, $W_{ij}$ é o peso da aresta, $\alpha$ e $\beta$ são parâmetros de entrada relacionados ao Feromônio e ao Peso, respectivamente.
+\newline
+\par
+Segue o pseudo código partindo de i:
+\newline
+\par
+
+\begin{algorithmic}
+ \IF {Somente um vizinho j}
+ \STATE retorna j
+ \ENDIF \FOR{j sendo cada vizinhos} 
+ \STATE Calcula o valor de $P_{ij}$ 
+ \STATE Guarda o melhor vizinho
+ \ENDFOR
+ \IF {fator de exploitation }
+ \STATE retorna o melhor vizinho
+ \ELSE 
+ \STATE retorna um vizinho de acordo com a distribuição de probabilidade da vizinhança
+ \ENDIF \end{algorithmic}
+
+\section{Experimentos}
+
+\subsection{Dados de entrada}
+
+Para os experimentos foram utilizadas 3 bases de dados diferentes, disponibilizadas em arquivos de texto simples contendo o número de nós e os pesos das arestas direcionadas do grafo. Para duas entradas sabe-se a solução ótima, enquanto que para uma das entradas não se sabe a solução ótima.
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l |}
+    \hline
+    Entrada & Nº Nós & Solução Ótima \\ \hline
+    Entrada 1 & 100 & 990\\ \hline
+    Entrada 2 & 20 & 168\\ \hline
+    Entrada 3 & 1000 & $Sem$ $resultado$ $conhecido$ \\ \hline
+    \end{tabular}
+\end{center}
+
+\subsection{Análise de sensibilidade dos Parâmetros}
+\par
+
+\subsubsection{Metodologia dos testes de sensibilidade}
+\par
+
+Primeiramente iremos executar testes para analisar alguns parâmetros de entrada do problema. Os valores serão executados separadamente para cada entrada do problema. 
+
+\begin{enumerate}
+  \item $\alpha$ e $\beta$
+  \begin{center}
+	\par
+    \begin{tabular}{| l | l | l | l | l | l | l | l | l |}
+    \hline
+    4/1 &
+    3/1 &
+    2/1 &
+    3/2 &
+    1/1 &
+    2/3 &
+    1/2 &
+    1/3 &
+    1/4 \\ \hline
+    \end{tabular}
+    \newline
+    $\alpha$ e $\beta$
+\end{center}
+  \item Exploitation Factor
+    \begin{center}
+    \begin{tabular}{| l | l | l | l | l |}
+    \hline
+    0.02 &
+    0.05 &
+    0.1 &
+    0.15 &
+    0.2 
+     \\ \hline
+    \end{tabular}\newline
+Exploitation Factor
+\end{center}
+  \item Número de Formigas
+  \begin{center}
+    \begin{tabular}{| l | l | l | l | l | l | l | l | l | l |}
+    \hline
+    20 &
+    40 &
+    60 &
+    80 &
+    100 &  
+    120 &  
+    140 &  
+    160 &  
+    180 &  
+    200
+     \\ \hline
+    \end{tabular}\newline
+    Ant\end{center}
+    
+\end{enumerate}
+
+ Para isto, foi analisado cada um dos parâmetros em separado mantendo fixo todos os outros parâmetros. Então, utilizaremos os melhores valores descobertos para executar um teste completo parametrizado para encontrar a melhor solução. 
+\newline \par
+A intenção é encontrar valores razoáveis que  executarão em tempo hábil no ambiente de testes e que aproximavam melhor dos valores ótimos. O número de iterações para a solução ótima foi fixado em 100. Como métrica de análise dos parâmetros isolados, foi considerado o melhor valor de custo do resultado para o problema Longest Path - ACO.
+
+\subsection{Análise de sensibilidade: $\alpha$ e $\beta$} 
+
+Iremos utilizar o melhor valor de $\alpha$ e $\beta$ baseando no valor do resultados para diferentes valores para $\alpha$ e $\alpha$ conforme metodologia acima.
+
+\subsubsection{$\alpha/\beta$ Entrada 1}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & 160 \\ \hline
+    Iterations & 100 \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & 0.1 \\ \hline
+    Alpha/Beta & Variáveis \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para variados $\alpha/\beta$
+\newline
+\pgfplotsset{compat=newest}
+
+
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=left, xlabel=$\alpha/\beta$, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+%\include{../results/results3_entrada1_alphabeta_best_solution}
+(0.25,	891.0)
+(0.333333,	873.0)
+(0.5,	852.0)
+(0.666667,	882.0)
+(1,	779.0)
+(1.5,	838.0)
+(2,	789.0)
+(3,	784.0)
+(4,	792.0)
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+%\include{../results/results3_entrada1_alphabeta_execution_time}
+(0.25,	285.1667)
+(0.333333,	198.2813)
+(0.5,	212.816)
+(0.666667,	191.9456)
+(1,	160.4694)
+(1.5,	146.9087)
+(2,	163.3871)
+(3,	166.3091)
+(4,	144.4528)
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de $\alpha$ e $\beta$ para a Entrada 1 é 0,25 ou $\alpha$ 1 e $\beta$ 4 com resultado 285,16. 
+
+
+\newpage
+\subsubsection{$\alpha/\beta$ Entrada 2}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & 160 \\ \hline
+    Iterations & 100 \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & 0.1 \\ \hline
+    Alpha/Beta & Variáveis \\ \hline
+    \end{tabular}
+\end{center}
+
+
+\par
+Soluções e tempos para variados $\alpha/\beta$
+\newline
+
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=left, xlabel=$\alpha/\beta$, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+%\include{../results/results3_entrada2_alphabeta_best_solution}
+(0.25,	167.0)
+(0.333333,	159.0)
+(0.5,	160.0)
+(0.666667,	168.0)
+(1,	148.0)
+(1.5,	156.0)
+(2,	152.0)
+(3,	154.0)
+(4,	152.0)
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+
+%\include{../results/results3_entrada2_alphabeta_execution_time}
+(0.25,	7.8912)
+(0.333333,	7.6708)
+(0.5,	9.4261)
+(0.666667,	8.7498)
+(1,	7.3936)
+(1.5,	7.1422)
+(2,	7.0705)
+(3,	7.6219)
+(4,	7.9029)
+
+
+};
+%
+
+
+\end{axis} 
+\end{tikzpicture}
+
+\par
+
+Podemos observar que o melhor resultado de $\alpha$ e $\beta$ para a Entrada 2 é 0,66667 ou $\alpha$ 2 e $\beta$ 3 com resultado 168.0. 
+
+
+
+
+
+
+\newpage
+\subsubsection{$\alpha/\beta$ Entrada 3}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf {100}\\ \hline
+    Iterations & \textbf{10} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & 0.1 \\ \hline
+    Alpha/Beta & Variáveis \\ \hline
+    \end{tabular}
+\end{center}
+
+
+
+\par
+Soluções e tempos para variados $\alpha/\beta$
+\newline
+
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=left, xlabel=$\alpha/\beta$, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+
+%\include{../results/results3_entrada3_alphabeta_best_solution}
+(0.25,	8861.0)
+(0.333333,	8495.0)
+(0.5,	8171.0)
+(0.666667,	8603.0)
+(1,	7365.0)
+(1.5,	8118.0)
+(2,	7435.0)
+(3,	7350.0)
+(4,	7416.0)
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=4, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+
+
+%\include{../results/results3_entrada3_alphabeta_execution_time}
+(0.25,	8152.4783)
+(0.333333,	8132.185)
+(0.5,	8123.3873)
+(0.666667,	8079.2017)
+(1,	8182.739)
+(1.5,	8162.5065)
+(2,	8140.1801)
+(3,	8164.8683)
+(4,	9678.6232)
+
+};
+%
+
+
+\end{axis} 
+\end{tikzpicture}
+
+
+
+\par
+
+Podemos observar que o melhor resultado de $\alpha$ e $\beta$ para a Entrada 3 é 0,25 ou $\alpha$ 4 e $\beta$ 1 com resultado 285,16. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+
+\subsection{Análise de sensibilidade: Exploitation Factor} 
+
+Iremos utilizar o melhor valor de Exploitation Factor baseando no valor do resultados para diferentes valores, conforme metodologia.
+
+\subsubsection{Exploitation Factor: Entrada 1}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf{100} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & Variável \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Exploitation Factor variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=left, xlabel=Exploitation Factor, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+(0.02,	736.0)
+(0.05,	789.0)
+(0.1,	771.0)
+(0.15,	791.0)
+(0.2,	798.0)
+
+
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+(0.02,	165.82)
+(0.05,	113.177)
+(0.1,	86.9943)
+(0.15,	84.3152)
+(0.2,	81.0696)
+
+
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Exploitation Factor para a Entrada 1 é 0,2 com resultado 798.0. 
+
+
+\newpage
+
+
+
+\subsubsection{Exploitation Factor: Entrada 2}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf{100} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & Variável \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Exploitation Factor variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=left, xlabel=Exploitation Factor, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+(0.02,	149.0)
+(0.05,	150.0)
+(0.1,	157.0)
+(0.15,	152.0)
+(0.2,	151.0)
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+
+(0.02,	8.7503)
+(0.05,	7.8024)
+(0.1,	8.1403)
+(0.15,	7.6218)
+(0.2,	7.3374)
+
+
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Exploitation Factor para a Entrada 2 é 0,1 com resultado 157.0. 
+
+
+\newpage
+
+
+
+
+
+
+
+
+
+\subsubsection{Exploitation Factor: Entrada 3}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf{60} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & Variável \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Exploitation Factor variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=left, xlabel=Exploitation Factor, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+
+(0.02,	7154.0)
+(0.05,	7218.0)
+(0.1,	7395.0)
+(0.15,	7489.0)
+(0.2,	7640.0)
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=0,xmax=0.2, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+
+
+(0.02,	16141.2195)
+(0.05,	15497.1819)
+(0.1,	16000.9459)
+(0.15,	15588.1636)
+(0.2,	14908.2905)
+
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Exploitation Factor para a Entrada 2 é 0,1 com resultado 157.0. 
+
+
+\newpage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Análise de sensibilidade: Formigas} 
+
+Iremos utilizar o melhor valor de número de formigas, baseando no valor do resultados para diferentes valores, conforme metodologia.
+
+\subsubsection{Formigas: Entrada 1}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf{Variável} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & \textbf{0.1} \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Formigas variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=left, xlabel=N. Formigas, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+
+
+(20,	37.5798)
+(40,	76.0668)
+(60,	112.1235)
+(80,	124.6808)
+(100,	120.7479)
+(120,	124.6601)
+(140,	125.6975)
+(160,	167.4593)
+(180,	178.6071)
+(200,	212.4959)
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+
+(20,	751.0)
+(40,	768.0)
+(60,	769.0)
+(80,	779.0)
+(100,	794.0)
+(120,	786.0)
+(140,	797.0)
+(160,	780.0)
+(180,	778.0)
+(200,	816.0)
+
+
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Formigas para a Entrada 1 é com resultado 200 . 
+
+
+\newpage
+
+
+
+
+
+\subsubsection{Formigas: Entrada 2}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants &  \textbf{Variável} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & \textbf{0.1} \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Formigas variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=left, xlabel=N. Formigas, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+
+
+(20,	1.4604)
+(40,	3.1081)
+(60,	4.4736)
+(80,	6.1284)
+(100,	7.4397)
+(120,	9.085)
+(140,	10.4069)
+(160,	11.4243)
+(180,	13.4491)
+(200,	14.801)
+
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+
+(20,	145.0)
+(40,	147.0)
+(60,	154.0)
+(80,	152.0)
+(100,	154.0)
+(120,	151.0)
+(140,	158.0)
+(160,	152.0)
+(180,	151.0)
+(200,	149.0)
+
+
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Formigas para a Entrada 2 é com resultado 200. 
+
+
+\newpage
+
+
+
+
+\subsubsection{Formigas: Entrada 3}
+\par Parâmetros:
+\newline
+\begin{center}
+    \begin{tabular}{| l | l | l | l |}
+    \hline
+    Parâmetro & Valor \\ \hline
+    Runs & 1 \\ \hline
+    Ants & \textbf{Variável} \\ \hline
+    Iterations & \textbf{100} \\ \hline
+    Initial pheromone amount & 20.0 \\ \hline
+    Ant pheromone deposit amount & 1.0 \\ \hline
+    Pheromone evaporation rate & 0.25 \\ \hline
+    Daemon pheromone deposit amount & 2.0 \\ \hline
+    Max pheromone threshold & 100.0 \\ \hline
+    Min pheromone threshold & 0.00 \\ \hline
+    Exploitation factor & \textbf{0.1} \\ \hline
+    Alpha/Beta & 1/1 \\ \hline
+    \end{tabular}
+\end{center}
+
+\par
+Soluções e tempos para Formigas variados
+\newline
+\pgfplotsset{compat=newest}
+\begin{tikzpicture}
+
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=left, xlabel=N. Formigas, ylabel=Best Solution (blue)]
+    \addplot[color=blue,mark=x] coordinates {
+
+
+
+(40,	483.5989)
+(80,	673.9752)
+(100,	2095.2499)
+(120,	3139.3339)
+(140,	2290.6941)
+(160,	4026.9757)
+(180,	3285.4439)
+(200,	3029.8155)
+
+
+
+
+};
+\end{axis}
+%
+\begin{axis}[ scale only axis, xmin=20,xmax=200, axis y line*=right, axis x line=none, ylabel=Execution Time (s) (red)]%
+    \addplot[color=red,mark=*] coordinates {
+    
+
+
+(40,	7335.0)
+(80,	7261.0)
+(100,	7345.0)
+(120,	7349.0)
+(140,	7160.0)
+(160,	7263.0)
+(180,	7345.0)
+(200,	7260.0)
+
+
+};
+%
+\end{axis} 
+\end{tikzpicture}
+
+\par
+Podemos observar que o melhor resultado de Formigas para a Entrada 3 é com resultado 160. 
+
+
+\newpage
+
+
+\subsection{Melhores Resultados: Aplicando a análise de sensibilidade no Problema} 
+
+
+Após determinarmos os melhores valores para os parâmetros estudos, dentre os valores analisados, iremos aplicá-los ao problema para determinar a melhor solução para o problema Longest Path utilizando ACO.
+
+Abaixo vemos uma tabela com detalhes de cada configuração a ser testada. 
+\newline
+\begin{center}
+    \begin{tabular}{l*{6}{c}}
+    \hline
+    Entrada & Execuções & Formigas & Iterações & Exploitation Factor &  $\alpha/\beta$ \\ \hline
+    Entrada 1 & 100 &200 & 100 & 0.2 & 1/4 \\ \hline
+    Entrada 2 & 100 &200 & 100 & 0.1 & 2/3\\ \hline
+    Entrada 3 & 10 &160 & 100 & 0.2 & 1/4\\ \hline
+    \end{tabular}
+\end{center}
+
+
+\subsubsection{Resultados: Entrada 1} 
+ Melhor Resultado Encontrado: \textbf{926.0}
+  \newline
+ Número de execuções: \textbf{100 execuções}
+ \newline
+ Número de iterações: \textbf{100 iterações}
+ \newline
+ \newline
+ Resultado Ótimo: 990
+ \newline
+ Resultado Encontrado / Ótimo :  926/990 \textbf{93.5\%} 
+ \newline
+ \newline
+ Tempo Total: \textbf{5.7 hrs.}
+ Tempo médio: \textbf{207 segs.} 
+ \newline
+ \newline
+ Caminho: [0, 26, 42, 24, 78, 91, 8, 3, 37, 85, 38, 66, 58, 79, 15, 1, 11, 98, 2, 30, 5, 62, 57, 28, 19, 45, 86, 32, 22, 96, 53, 20, 83, 16, 75, 88, 14, 51, 73, 93, 69, 90, 31, 6, 76, 63, 4, 18, 55, 64, 52, 13, 40, 39, 94, 9, 97, 17, 67, 50, 35, 71, 70, 34, 77, 82, 61, 12, 36, 65, 44, 23, 25, 48, 49, 72, 27, 54, 81, 92, 68, 29, 21, 84, 95, 10, 43, 56, 89, 60, 80, 59, 7, 74, 87, 47, 33, 41, 46, 99]
+
+
+\subsubsection{Resultados: Entrada 2}
+ Melhor Resultado: \textbf{168.0}  
+ \newline
+ Número de execuções: \textbf{100 execuções}
+ \newline
+ Número de iterações: \textbf{100 iterações}
+ \newline
+ \newline
+ Resultado Ótimo: 168
+ \newline
+ Resultado Encontrado / Ótimo :  168/168 \textbf{100\%} 
+ \newline
+ \newline
+ Tempo Total: \textbf{10 min.}
+ Tempo Médio: \textbf{6 segs.}
+ \newline
+ \newline
+ Caminho: [0, 18, 14, 1, 9, 10, 3, 6, 12, 8, 7, 11, 16, 17, 15, 5, 4, 2, 13, 19]
+
+\newpage
+
+\subsubsection{Resultados: Entrada 3}
+ Melhor Resultado: \textbf{9,063}
+ \newline
+ Número de execuções: \textbf{10 execuções}
+ \newline
+ Número de iterações: \textbf{100 iterações}
+ \newline
+ \newline
+ Tempo Total de Execução \textbf{7,57 hrs.}
+ Tempo Médio: \textbf{46min.}
+ \newline
+ \newline
+ Caminho: Segue juntamente do código fonte.
+ 
+ \subsection{Conclusão e Próximos passos}
+Foi implementado um ACO buscando resolver o problema do Longest Path com resultados de 93,5\% da solução ótima no primeiro problema, 100\% no segundo e um resultado de 9,063 para o terceiro problema.
+\newline
+\par
+
+Como foi verificado, alguns parâmetros poderiam ser melhorados ainda mais, visto que ficaram na borda do domínio que foram estudados, como o número de formigas e o exploitation factor no exemplo 3.
+\newline
+\par
+O grande problema na classe de problemas metaheurísticas é selecionar os melhores valores para os parâmetros possibilita minimizar o processamento e equilibrar a taxa de convergência do problema. 
+\newline
+\par
+Mesmo aplicando conceitos de paralelização, ainda assim o tempo computacional atrapalhou a execução dos testes. Uma alternativa seria aplicar o problema em uma linguagem mais rápida como java ou c.
+\newline
+\par
+
+
+\subsection {Ambiente de Testes}
+\par
+OS X El Capitan $10.11.1$ $(15B42)$
+\newline
+MacBook Pro (Retina, 13-inch, Early 2015)
+\newline
+$2.9$ GHz Intel Core i5
+\newline
+8 GB 1867 MHz DDR3
+
+\clearpage
+\begin{thebibliography}{9}
+\bibitem{}
+  M. Dorigo, V. Maniezzo e A. Colorni,
+  \emph{The Ant System: Optimization by a colony of cooperating agents},
+  1996.
+
+  \bibitem{}
+  M. Dorigo,
+  \emph{ Optimization, Learning and Natural Algorithms},
+  Politecnico di Milano,
+  Italy.
+  1992.
+  
+  \bibitem{}
+  M. Dorigo,
+  \emph{Ant Colony Optimization},
+  Scholarpedia,
+  2007.
+  
+  \bibitem{}
+  Wan-Shiou Yang e Shi-Xin Weng,
+  \emph{Application of the Ant Colony Optimization Algorithm to the Influence-Maximization Problem},
+  2012.
+\end{thebibliography}
+
+\end{document}
